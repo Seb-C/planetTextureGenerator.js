@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html>
+	<body>
+		<script type="text/javascript">
+			var resolution = 512;
+			var variabilityRate = 1.25;
+			var maxColours = 10;
+			 
+			// Getting canvas pixel array
+			var canvas = document.createElement("canvas");
+			canvas.style.display = "block";
+			canvas.width  = resolution;
+			canvas.height = resolution / 2;
+			var context = canvas.getContext("2d");
+			var imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+			var texturePixels = imageData.data;
+			document.currentScript.parentNode.appendChild(canvas);
+			 
+			function refreshTexture() {
+			    // Colors applied to the texture, depending on it's height
+			    var colorsNumber = Math.ceil((1 - Math.exp(Math.random()) / Math.E) * maxColours);
+			    var colorSteps = [];
+			    for(var i = 0 ; i < colorsNumber ; i++) {
+			        colorSteps.push({
+			            minValue: (1 / colorsNumber) * i,
+			            color: [
+			                Math.random() * 255,
+			                Math.random() * 255,
+			                Math.random() * 255
+			            ]
+			        });
+			    }
+			     
+			    // Initializing relief array with the points of the first square
+			    var textureRelief = new Float32Array((resolution + 1) * (resolution + 1));
+			    textureRelief[0                                   ] = Math.random();
+			    textureRelief[resolution                          ] = Math.random();
+			    textureRelief[             resolution * resolution] = Math.random();
+			    textureRelief[resolution + resolution * resolution] = Math.random();
+			     
+			    var setPixel = function(x, y, value) {
+			        var pixelIndex = x + y * resolution;
+			         
+			        textureRelief[pixelIndex] = value;
+			         
+			        var colorValue = value;
+			        if(colorValue < 0) colorValue = 0;
+			        if(colorValue > 1) colorValue = 1;
+			         
+			        // Determining pixel color
+			        var color = colorSteps[0].color;
+			        for(var i = 1 ; i < colorSteps.length ; i++) {
+			            if(colorValue >= colorSteps[i].minValue) {
+			                color = colorSteps[i].color;
+			            } else {
+			                break;
+			            }
+			        }
+			         
+			        // Setting pixel color
+			        var pixelIndexRGB = pixelIndex * 4;
+			        texturePixels[pixelIndexRGB    ] = Math.round(color[0] * colorValue); // R
+			        texturePixels[pixelIndexRGB + 1] = Math.round(color[1] * colorValue); // G
+			        texturePixels[pixelIndexRGB + 2] = Math.round(color[2] * colorValue); // B
+			        texturePixels[pixelIndexRGB + 3] = 255;                               // A
+			    };
+			 
+			    // Diamond-Square algorithm
+			    var halfSizeY = ((resolution + 1) / 2 + 0.5);
+			    for(var currentSize = resolution ; currentSize > 1 ; currentSize /= 2) {
+			        var halfCurrentSize = currentSize / 2;
+			         
+			        // Square
+			        for(var x = halfCurrentSize ; x < resolution + 1 ; x += currentSize) {
+			            for(var y = halfCurrentSize ; y <= halfSizeY ; y += currentSize) {
+			                var squareAvg = (
+			                      textureRelief[(x - halfCurrentSize) + (y - halfCurrentSize) * resolution]
+			                    + textureRelief[(x + halfCurrentSize) + (y - halfCurrentSize) * resolution]
+			                    + textureRelief[(x + halfCurrentSize) + (y + halfCurrentSize) * resolution]
+			                    + textureRelief[(x - halfCurrentSize) + (y + halfCurrentSize) * resolution]
+			                ) / 4;
+			                 
+			                var diamondAvg = diamondSum / diamondCount;
+			                if(y == 0 || y == halfSizeY - 1) {
+			                    setPixel(x, y, 0.5); // First and last lines are always at a constant height to be applicable on a sphere
+			                } else {
+			                    setPixel(x, y, squareAvg + ((Math.random() * 2 - 1) * currentSize * variabilityRate) / (resolution + 1));
+			                }
+			            }
+			        }
+			         
+			        // Diamond
+			        for(var x = 0 ; x < resolution ; x += halfCurrentSize) {
+			            var yStart = ((x / halfCurrentSize) % 2 == 0) ? halfCurrentSize : 0; 
+			             
+			            for(var y = yStart ; y <= halfSizeY ; y += currentSize) {
+			                var diamondSum = 0, diamondCount = 0;
+			                 
+			                if(y - halfCurrentSize >= 0) {
+			                    diamondSum += textureRelief[x + (y - halfCurrentSize) * resolution];
+			                    diamondCount++
+			                }
+			                if(x + halfCurrentSize < resolution + 1) {
+			                    diamondSum += textureRelief[(x + halfCurrentSize) + y * resolution];
+			                    diamondCount++
+			                }
+			                if(y + halfCurrentSize < halfSizeY) {
+			                    diamondSum += textureRelief[x + (y + halfCurrentSize) * resolution];
+			                    diamondCount++
+			                }
+			                if(x - halfCurrentSize >= 0) {
+			                    diamondSum += textureRelief[(x - halfCurrentSize) + y * resolution];
+			                    diamondCount++
+			                }
+			                 
+			                var diamondAvg = diamondSum / diamondCount;
+			                if(y == 0 || y == halfSizeY - 1) {
+			                    setPixel(x, y, 0.5); // First and last lines are always at a constant height to be applicable on a sphere
+			                } else {
+			                    setPixel(x, y, diamondAvg + ((Math.random() * 2 - 1) * currentSize * variabilityRate) / (resolution + 1));
+			                    if(x == 0) setPixel(resolution, y, textureRelief[x + y * resolution]); // Makes it tileable horizontally
+			                }
+			            }
+			        }
+			    }
+			     
+			    context.putImageData(imageData, 0, 0);
+			};
+			refreshTexture();
+			 
+			// Refresh button
+			var refreshButton = document.createElement("input");
+			refreshButton.setAttribute("type", "button");
+			refreshButton.setAttribute("value", "New texture");
+			refreshButton.addEventListener("click", refreshTexture);
+			document.currentScript.parentNode.appendChild(refreshButton);
+		</script>
+	</body>
+</html>
